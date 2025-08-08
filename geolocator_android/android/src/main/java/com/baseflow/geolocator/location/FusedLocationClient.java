@@ -34,6 +34,9 @@ import java.security.SecureRandom;
 
 class FusedLocationClient implements LocationClient {
   private static final String TAG = "FlutterGeolocator";
+  private static final long DIALOG_SHOW_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+  private static boolean isDialogShowing = false;
+  private static long lastDialogShowTime = 0;
 
   private final Context context;
   private final LocationCallback locationCallback;
@@ -200,6 +203,8 @@ class FusedLocationClient implements LocationClient {
   }
 
   public boolean onActivityResult(int requestCode, int resultCode) {
+    isDialogShowing = false;
+
     if (requestCode == activityRequestCode) {
       if (resultCode == Activity.RESULT_OK) {
         if (this.locationOptions == null
@@ -252,10 +257,19 @@ class FusedLocationClient implements LocationClient {
                 int statusCode = rae.getStatusCode();
                 if (statusCode == LocationSettingsStatusCodes.RESOLUTION_REQUIRED) {
                   try {
+                    long currentTime = System.currentTimeMillis();
+                    if (isDialogShowing || (lastDialogShowTime != 0 && (currentTime - lastDialogShowTime) < DIALOG_SHOW_INTERVAL_MS)) {
+                      return;
+                    }
+
                     // Show the dialog by calling startResolutionForResult(), and check the
                     // result in onActivityResult().
                     rae.startResolutionForResult(activity, activityRequestCode);
+
+                    isDialogShowing = true;
+                    lastDialogShowTime = currentTime;
                   } catch (IntentSender.SendIntentException sie) {
+                    isDialogShowing = false;
                     errorCallback.onError(ErrorCodes.locationServicesDisabled);
                   }
                 } else {
